@@ -1,0 +1,22 @@
+# Patient data and source recordings
+Dator_ejemplo/
+*.dcm
+*.pdf
+*.csv
+
+# Generated ECG signals, metadata, and validation plots
+salida*/
+output/
+outputs/
+*.png
+
+# Virtual environments and Python artifacts
+ECG_Etel/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Editor and operating system files
+.DS_Store
+.vscode/
