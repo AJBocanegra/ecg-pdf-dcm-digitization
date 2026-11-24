@@ -83,6 +83,10 @@ For a multi-page PDF, output names include the page number, for example `<pdf_na
 
 Do not commit patient recordings or generated outputs. ECG PDFs and DICOM files may contain protected health information, and PDF metadata output preserves page text in `extra_json`. Output signal and metadata CSV files may also be sensitive. The repository `.gitignore` excludes common input and output file types, but always inspect `git status` before committing and do not use `git add -f` on patient data.
 
+## License
+
+This project is licensed under the [MIT License](./LICENSE).
+
 ## Project layout
 
 ```text
