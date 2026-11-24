@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pydicom
 
-from .common import FS_OUT, LEADS, ECGRecord, to_fixed_rate
+from .common import FS_OUT, LEADS, ECGRecord, center_by_median, to_fixed_rate
 
 ANNOTATION_FIELDS = {
     "RR Interval": "rr_ms",
@@ -41,15 +41,35 @@ def _leer_grupo(g):
 
 
 def recortar_calibracion(t, mv):
-    """Quita el pulso de 1 mV del final y el tramo plano previo. Devuelve (t, mv, recortado)."""
-    d = np.diff(mv, axis=0, prepend=mv[:1])
-    subidas = np.flatnonzero((d > 0.8).all(axis=1))  # sin abs: el flanco de bajada también supera 0.8
-    if len(subidas) == 0 or subidas[-1] < len(mv) * 0.5:
+    """Detecta un pulso rectangular final común, supuesto de 1 mV, y calibra cada canal."""
+    if len(t) < 3 or not np.isfinite(mv).all():
         return t, mv, False
-    i = subidas[-1]
-    while i > 1 and (d[i - 1] == 0).all():
-        i -= 1
-    return t[: i - 1], mv[: i - 1], True
+    dt = np.median(np.diff(t))
+    n_min = max(3, int(round(0.02 / dt)))
+    d = np.diff(mv, axis=0)
+    subidas = np.flatnonzero((d > 0.5).all(axis=1)) + 1
+    for subida in subidas[::-1]:
+        if subida < len(mv) // 2 or subida < n_min:
+            continue
+        bajadas = np.flatnonzero((d[subida:] < -0.5).all(axis=1)) + subida + 1
+        for bajada in bajadas:
+            if bajada - subida < n_min or len(mv) - bajada < n_min:
+                continue
+            cero = np.median(mv[subida - n_min:subida], axis=0)
+            alto = np.median(mv[subida:bajada], axis=0)
+            altura = alto - cero
+            if not (np.all((altura > 0.5) & (altura < 2.0))
+                    and np.allclose(mv[subida - n_min:subida], cero, atol=0.01)
+                    and np.allclose(mv[subida:bajada], alto, atol=0.01)
+                    and np.allclose(mv[bajada:], cero, atol=0.01)):
+                continue
+            inicio = subida
+            while inicio > 0 and np.allclose(mv[inicio - 1], cero, atol=0.01):
+                inicio -= 1
+            if inicio == 0:
+                continue
+            return t[:inicio], (mv[:inicio] - cero) / altura, True
+    return t, mv, False
 
 
 def _fecha(valor):
@@ -83,10 +103,14 @@ def read_dicom(dcm_path: Path, csv_path: Path | None = None) -> list[ECGRecord]:
     fs, mv, canal, etiqueta = max(grupos, key=lambda x: len(x[1]))
     t = np.arange(len(mv)) / fs
     t, mv, recortado = recortar_calibracion(t, mv)
+    if not recortado:
+        print("  no reliable trailing calibration pulse found; using DICOM channel sensitivities")
     t, mv = to_fixed_rate(t, mv, FS_OUT)
+    mv = center_by_median(mv)
 
     campos, otras, fiduciales, textos = _anotaciones(ds)
-    extra = {"waveform_group": etiqueta, "other_measurements": otras, "fiducials_samples": fiduciales}
+    extra = {"waveform_group": etiqueta, "other_measurements": otras,
+             "fiducials_samples": fiduciales, "baseline": "per_lead_median"}
     if csv_path:
         extra["paired_dicom_dump_csv"] = csv_path.name
     meta = {

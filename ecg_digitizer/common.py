@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 LEADS = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"]
-FS_OUT = 500  # Hz
+FS_OUT = 1000  # Hz
 
 # Esquema único de metadatos, independiente del origen (PDF o DICOM).
 METADATA_COLUMNS = [
@@ -26,6 +26,16 @@ class ECGRecord:
     t: np.ndarray  # segundos
     mv: np.ndarray  # (n_muestras, 12) en mV, columnas en orden LEADS
     metadata: dict = field(default_factory=dict)
+
+
+def center_by_median(mv):
+    """Center each available lead after calibration and resampling."""
+    out = mv.copy()
+    for j in range(out.shape[1]):
+        valid = np.isfinite(out[:, j])
+        if valid.any():
+            out[valid, j] -= np.median(out[valid, j])
+    return out
 
 
 def to_fixed_rate(t, mv, fs=FS_OUT):

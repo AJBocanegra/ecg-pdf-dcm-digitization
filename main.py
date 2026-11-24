@@ -9,7 +9,7 @@ from ecg_digitizer.writer import write_record
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Extract ECG waveforms from vector PDFs or DICOM files to 500 Hz CSV.")
+    ap = argparse.ArgumentParser(description="Extract ECG waveforms from vector PDFs or DICOM files to 1000 Hz CSV.")
     ap.add_argument("-i", "--input", required=True, type=Path, help="folder with PDFs or DICOM files")
     ap.add_argument("-o", "--output", required=True, type=Path, help="output folder")
     ap.add_argument("--plot", action="store_true", help="save one validation PNG per ECG")
